@@ -26,7 +26,7 @@ io.on("connection",(socket)=>{
 
   socket.on('send_message',(messageData)=>{
     // console.log(`sendMessage 실행 with ${JSON.stringify(messageData,null,"  ")}`)
-    socket.to(messageData.roomNum).emit('receive_message',messageData)
+    io.to(messageData.roomNum).emit('receive_message',messageData)
   })
 
   socket.on("disconnect",()=>

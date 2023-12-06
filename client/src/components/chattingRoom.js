@@ -1,29 +1,22 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom"
 import styled from 'styled-components'
 import io from 'socket.io-client'
 
 const socket = io.connect('http://localhost:3001');
 
-const ChattingRoom = ({rooms}) => {
+const ChattingRoom = ({rooms, setLatestMessage}) => {
   const params = useParams()
   const room = useMemo(()=>rooms.find(item => String(item.id) === params.id),[params])
   const [text,setText] = useState('')
   const [textList,setTextList] = useState([])
-  
-  const checkIsUserMe = useMemo(() => {
-    if(room.id === socket.id){
-      return true
-    }else{
-      return false
-    }
-  },[socket,room]) 
 
   const sendMessage = useCallback(async(e,roomNum) => {
     e.preventDefault();
     if(text!==""){
       const messageInfo = {
         roomNum:roomNum,
+        isMyText : false,
         text,
         name:socket.id,
         time:new Date().getHours() + ":" + new Date().getMinutes()
@@ -32,32 +25,34 @@ const ChattingRoom = ({rooms}) => {
     }
     setText('')
   },[socket,text])
+
+  const receiveMessage = useCallback(() => {
+    socket.on('receive_message',(messageData)=>{
+      messageData.name === socket.id ? messageData.isMyText = true : messageData.isMyText = false
+      setTextList((prev)=>[...prev,messageData])
+      setLatestMessage(messageData)  
+    })
+  },[socket])
   
   useEffect(()=>{
     socket.emit('join_room',room.id)
   },[])
-
+  
   useEffect(()=>{
-    socket.on('receive_message',(messageData)=>{
-      setTextList((prev)=>[...prev,messageData])
-    })
+    receiveMessage()
   },[socket])
 
   return(
     <ChattingRoomContainer>
       <h3>{room.roomName}</h3>
     
-      {
-        checkIsUserMe 
-        ?
-          <div>
-            {textList.map((e,idx)=> <MyTextArea key ={String(idx)}> <MyText>{e.text}</MyText> <Time>{e.time}</Time></MyTextArea>)}
-          </div>
-        :
-          <div>
-            {textList.map((e,idx)=> <YourTextArea key ={String(idx)}> <YourText>{e.text}</YourText> <Time>{e.time}</Time> </YourTextArea>)}
-          </div>
-      }
+      <div>
+        {textList.map((e,idx)=> e.isMyText ? 
+            <MyTextArea key ={String(idx)}> <MyText>{e.text}</MyText> <Time>{e.time}</Time></MyTextArea> : 
+            <YourTextArea key ={String(idx)}> <YourText>{e.text}</YourText> <Time>{e.time}</Time> </YourTextArea>)}
+      </div>
+
+
 
       <InputArea>
         <PlusBtn>+</PlusBtn>
@@ -76,11 +71,10 @@ const ChattingRoomContainer = styled.div`
   width:400px;
   margin:0 auto;
   height:100vh;
-  background-color: #9bbbd4;
+  background-color: rgb(205,255,200);
   border: none;
   position:relative;
   padding:0;
-  overflow:hidden;
 `
 
 const MyTextArea = styled.div`
@@ -96,9 +90,10 @@ const YourTextArea = styled(MyTextArea)`
 `
 
 const MyText = styled.p`
+  /* background-color: #f7e600; */
   background-color: #f7e600;
   border-radius: 8px;
-  padding: 8px;
+  padding: 10px;
   max-width: 200px;
   font-size: 12px;
   margin-bottom:5px;
